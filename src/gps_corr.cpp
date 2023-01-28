@@ -162,8 +162,37 @@ public:
                 1.0f, 10.0f, "%.0f", 
                 ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput);
             static bool is_show_peak_line = false;
-            ImGui::Checkbox("Is Always Correlate", &gps_app.GetIsAlwaysCorrelate());
-            ImGui::Checkbox("Is Show Peak Line", &is_show_peak_line);
+            static int selected_freq_index = 0;
+            ImGui::Checkbox("Is always correlate", &gps_app.GetIsAlwaysCorrelate());
+            ImGui::Checkbox("Is show peak line", &is_show_peak_line);
+
+            enum DisplayMode {
+                BEST, MODE, MANUAL
+            };
+
+            static auto get_display_mode_string = [](DisplayMode mode) {
+                switch (mode) {
+                case DisplayMode::MODE:     return "Mode";
+                case DisplayMode::BEST:     return "Best";
+                case DisplayMode::MANUAL:   return "Manual";
+                default:                    return "Unknown";
+                }
+            };
+
+            static auto display_mode = DisplayMode::MODE;
+
+            if (ImGui::BeginCombo("Display mode", get_display_mode_string(display_mode))) {
+                static auto render_entry = [](DisplayMode mode, DisplayMode& curr) {
+                    const bool is_selected = (mode == curr);
+                    if (ImGui::Selectable(get_display_mode_string(mode), is_selected)) {
+                        curr = mode;
+                    }
+                };
+                render_entry(DisplayMode::MODE, display_mode);
+                render_entry(DisplayMode::BEST, display_mode);
+                render_entry(DisplayMode::MANUAL, display_mode);
+                ImGui::EndCombo();
+            }
 
             if (ImGui::BeginTabBar("Correlators")) {
                 auto& correlators = gps_app.GetCorrelators();
@@ -182,22 +211,42 @@ public:
                         trigger_flag = 100;
                         auto& correlations = correlator.GetCorrelations();
                         auto& freq_offsets = correlator.GetFrequencyOffsets();
-
-                        const auto best_freq_index = correlator.GetBestFrequencyOffsetIndex();
-                        const auto peak_index = correlator.GetCorrelationPeakIndex();
                         const int TOTAL_CORRELATIONS = (int)correlations.size();
-                        const auto freq_offset = freq_offsets[best_freq_index];
 
-                        ImGui::Text("Best offset= %.1fkHz", freq_offset * 1e-3f);
+                        int freq_index = 0;
+                        switch (display_mode) {
+                        case DisplayMode::BEST:
+                            freq_index = correlator.GetBestFrequencyOffsetIndex();
+                            break;
+                        case DisplayMode::MODE:
+                            freq_index = correlator.GetModeFrequencyOffsetIndex();
+                            break;
+                        case DisplayMode::MANUAL:
+                            ImGui::SliderInt(
+                                "Selected frequency", 
+                                &selected_freq_index, 0, TOTAL_CORRELATIONS-1, 
+                                "%d", 
+                                ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput); 
+                            freq_index = selected_freq_index;
+                            break;
+                        }
+
+                        const float freq_offset = freq_offsets[freq_index];
+                        auto& x_corr = correlations[freq_index];
+                        ImGui::Text("Frequency offset= %.1fkHz", freq_offset * 1e-3f);
                         if (ImPlot::BeginPlot("Correlation Peak")) {
                             ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0f, 100.0f, ImPlotCond_Once);
-                            auto& x_corr = correlations[best_freq_index];
                             ImPlot::PlotLine("Magnitude", x_corr.data(), (int)x_corr.size());
 
                             if (is_show_peak_line) {
+                                int peak_index = 0; 
+                                float peak_value = 0.0f;
+                                GetCorrelationPeakIndex(x_corr, peak_index, peak_value);
                                 double marker_0 = (double)peak_index;
+                                double marker_1 = (double)peak_value;
                                 int marker_id = 0;
                                 ImPlot::DragLineX(marker_id++, &marker_0, ImVec4(1,0,0,1), 1.0f, ImPlotDragToolFlags_NoInputs);
+                                ImPlot::DragLineY(marker_id++, &marker_1, ImVec4(1,0,0,1), 1.0f, ImPlotDragToolFlags_NoInputs);
                             }
                             ImPlot::EndPlot();
                         }
@@ -214,6 +263,22 @@ public:
     }
     virtual void AfterShutdown() {
         ImPlot::DestroyContext();
+    }
+private:
+    void GetCorrelationPeakIndex(tcb::span<const float> x, int& index, float& value) {
+        int peak_index = 0;
+        float peak_value = x[0];
+        const size_t N = x.size();
+        for (size_t i = 0; i < N; i++) {
+            const float v = x[i];
+            if (v > peak_value) {
+                peak_value = v;
+                peak_index = (int)i;
+            }
+        }
+
+        index = peak_index;
+        value = peak_value;
     }
 };
 

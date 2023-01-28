@@ -40,6 +40,8 @@ GPS_Correlator::GPS_Correlator(
     }
     const int TOTAL_FREQ_OFFSETS = (int)freq_offsets.size();
 
+    freq_offset_index_histogram = std::make_unique<Histogram>(TOTAL_FREQ_OFFSETS);
+
     // Allocate buffers
     for (int i = 0; i < TOTAL_FREQ_OFFSETS; i++) {
         freq_shifted_prn_codes.push_back({ (size_t)block_size, SIMD_ALIGN_AMOUNT });
@@ -114,20 +116,26 @@ void GPS_Correlator::Process(tcb::span<const std::complex<float>> x_in_fft) {
         }
     }
 
-    // Find the location of the correlation peak
-    int peak_index = 0;
-    {
-        auto& y_corr = freq_shifted_correlation_output[freq_offset_index];
-        float peak_value = y_corr[0];
-        for (int i = 0; i < block_size; i++) {
-            const float v = y_corr[i];
+    best_frequency_offset_index = freq_offset_index;
+    freq_offset_index_histogram->PushIndex(freq_offset_index);
+}
+
+int GPS_Correlator::GetModeFrequencyOffsetIndex() const {
+    return freq_offset_index_histogram->GetMode();
+}
+
+void GPS_Correlator::FindCorrelationPeak(tcb::span<const float> x, int& index, float& value) {
+        int peak_index = 0;
+        float peak_value = x[0];
+        const size_t N = x.size();
+        for (size_t i = 0; i < N; i++) {
+            const float v = x[i];
             if (v > peak_value) {
                 peak_value = v;
-                peak_index = i;
+                peak_index = (int)i;
             }
         }
-    }
 
-    best_frequency_offset_index = freq_offset_index;
-    corr_peak_index = peak_index;
-}
+        index = peak_index;
+        value = peak_value;
+    }
