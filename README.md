@@ -14,3 +14,4 @@ This is not GPS decoding software, it is only used for testing whether or not yo
 1. How GPS PRN codes are generated [link](https://natronics.github.io/blag/2014/gps-prn)
 2. How GPS spread codes work [link](https://natronics.github.io/blag/2014/gps-spreading/)
 3. Instructions for running SDR software for decoding GPS signals [youtube-link](https://www.youtube.com/watch?v=YG2fJRTAoHA)
+4. Website for determining which satellites are visible from your location [gnss-radar](http://taroz.net/GNSS-Radar.html)

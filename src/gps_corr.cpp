@@ -161,7 +161,9 @@ public:
                 &app.GetExtraGain(), 
                 1.0f, 10.0f, "%.0f", 
                 ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_ClampOnInput);
+            static bool is_show_peak_line = false;
             ImGui::Checkbox("Is Always Correlate", &gps_app.GetIsAlwaysCorrelate());
+            ImGui::Checkbox("Is Show Peak Line", &is_show_peak_line);
 
             if (ImGui::BeginTabBar("Correlators")) {
                 auto& correlators = gps_app.GetCorrelators();
@@ -192,9 +194,11 @@ public:
                             auto& x_corr = correlations[best_freq_index];
                             ImPlot::PlotLine("Magnitude", x_corr.data(), (int)x_corr.size());
 
-                            double marker_0 = (double)peak_index;
-                            int marker_id = 0;
-                            ImPlot::DragLineX(marker_id++, &marker_0, ImVec4(1,0,0,1), 1.0f, ImPlotDragToolFlags_NoInputs);
+                            if (is_show_peak_line) {
+                                double marker_0 = (double)peak_index;
+                                int marker_id = 0;
+                                ImPlot::DragLineX(marker_id++, &marker_0, ImVec4(1,0,0,1), 1.0f, ImPlotDragToolFlags_NoInputs);
+                            }
                             ImPlot::EndPlot();
                         }
                         ImGui::EndTabItem();
